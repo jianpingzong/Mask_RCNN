@@ -29,9 +29,10 @@ Usage: import the module (see Jupyter notebooks for examples), or run from
 
 import os
 import sys
+import json
 import time
 import numpy as np
-import imgaug  # https://github.com/aleju/imgaug (pip3 install imgaug)
+import skimage.draw
 
 import zipfile
 import urllib.request
@@ -46,12 +47,24 @@ from mrcnn.config import Config
 from mrcnn import model as modellib, utils
 
 # Path to trained weights file
-COCO_MODEL_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
+COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 
 # Directory to save logs and model checkpoints, if not provided
 # through the command line argument --logs
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_DATASET_YEAR = "2014"
+
+# detective class
+CLA_DIC = {
+    'crack': 1,
+    'cornerfracture': 2,
+    'seambroken': 3,
+    'patch': 4,
+    'repair': 5,
+    'slab': 6,
+    'track': 7,
+    'light': 8
+}
 
 ############################################################
 #  Configurations
@@ -142,7 +155,7 @@ class DiseaseDataset(utils.Dataset):
                 'all_points_x': [x for x in shape['points'][0]],
                 'all_points_y': [y for y in shape['points'][1]],
                 'name': shape['label']
-            } for shape in annotation['shapes']]
+            } for shape in annotation['shapes'] if shape['label'] in CLA_DIC.keys()]
             image_path = os.path.join(dataset_dir, annotation['imagePath'])
 
             self.add_image(
@@ -241,17 +254,18 @@ class DiseaseDataset(utils.Dataset):
         info = self.image_info[image_id]
         mask = np.zeros([info["height"], info["width"], len(info["polygons"])],
                         dtype=np.uint8)
+        class_ids = []
         for i, p in enumerate(info["polygons"]):
             # Get indexes of pixels inside the polygon and set them to 1
             rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
             mask[rr, cc, i] = 1
 
-        # class_ids preparation
-        class_ids = np.array(image_info['class_id'], dtype=np.int32)
+            # class_ids preparation
+            class_ids.append(CLA_DIC[p['name']])
 
         # Return mask, and array of class IDs of each instance. Since we have
         # one class ID only, we return an array of 1s
-        return mask.astype(np.bool), class_ids
+        return mask.astype(np.bool), np.array(class_ids, dtype=np.int32)
 
     def image_reference(self, image_id):
         """Return the path of the image."""

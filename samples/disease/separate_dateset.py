@@ -39,7 +39,7 @@ if __name__ == '__main__':
             val_counter += 1
         else:
             shutil.move(os.path.join(args.dataset, j), os.path.join(args.dataset, 'train'))
-            shutil.move(os.path.join(args.dataset, ann['imagePath']), os.path.join(args.dataset, 'val'))
+            shutil.move(os.path.join(args.dataset, ann['imagePath']), os.path.join(args.dataset, 'train'))
             train_counter += 1
 
     print("train file num: {}\n"

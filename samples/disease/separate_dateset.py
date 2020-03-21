@@ -8,7 +8,7 @@ if __name__ == '__main__':
     # Parse command line arguments.
     parser = argparse.ArgumentParser(description="Separate dataset into train and val.")
     parser.add_argument('--dataset', required=True, help="Path of the dataset.")
-    parser.add_argument('--ratio', default=0.2, required=False, help="Division ratio of val.")
+    parser.add_argument('--ratio', default=0.2, type=float, required=False, help="Division ratio of val.")
     args = parser.parse_args()
 
     if not os.path.exists(args.dataset):
@@ -38,6 +38,9 @@ if __name__ == '__main__':
         dst = 'train'
         if ix in rand_val_ix:
             dst = 'val'
+        if not os.path.exists(os.path.join(args.dataset, t[1])):
+            print("Image {} does not exist, maybe caused by a bug from LabelMe".format(t[1]))
+            continue
         shutil.move(os.path.join(args.dataset, t[0]), os.path.join(args.dataset, dst))
         shutil.move(os.path.join(args.dataset, t[1]), os.path.join(args.dataset, dst))
 

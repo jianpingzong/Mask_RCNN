@@ -32,6 +32,7 @@ import sys
 import json
 import time
 import numpy as np
+import skimage
 import skimage.draw
 
 import zipfile
@@ -157,12 +158,14 @@ class DiseaseDataset(utils.Dataset):
                 'name': shape['label']
             } for shape in annotation['shapes'] if shape['label'] in CLA_DIC.keys()]
             image_path = os.path.join(dataset_dir, annotation['imagePath'])
+            image = skimage.io.imread(image_path)
+            height, width = image.shape[:2]
 
             self.add_image(
                 "disease",
                 image_id=annotation['imagePath'],  # use file name as a unique image id
                 path=image_path,
-                width=annotation['imageWidth'], height=annotation['imageHeight'],
+                width=width, height=height,
                 polygons=polygons)
 
     def auto_download(self, dataDir, dataType, dataYear):

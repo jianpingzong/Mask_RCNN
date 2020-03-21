@@ -152,6 +152,7 @@ class DiseaseDataset(utils.Dataset):
             if not i.endswith('.json'):
                 continue
             annotation = json.load(open(os.path.join(dataset_dir, i)))
+            print(annotation)
             polygons = [{
                 'all_points_x': [x for x in shape['points'][0]],
                 'all_points_y': [y for y in shape['points'][1]],

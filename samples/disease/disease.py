@@ -299,7 +299,7 @@ def train(model):
     aug = iaa.Sequential([
         iaa.Fliplr(0.5), # horizontal flips
         iaa.Flipud(0.5), # vertical flips
-        iaa.Crop(percent=(-0.25, 0.25)), # random crops
+        iaa.Crop(percent=(0, 0.25)), # random crops
         # Small gaussian blur with random sigma between 0 and 0.5.
         # But we only blur about 50% of all images.
         iaa.Sometimes(

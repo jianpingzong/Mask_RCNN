@@ -152,22 +152,24 @@ class DiseaseDataset(utils.Dataset):
             if not i.endswith('.json'):
                 continue
             annotation = json.load(open(os.path.join(dataset_dir, i)))
-            print(os.path.join(dataset_dir, i))
-            polygons = [{
-                'all_points_x': [x for x in shape['points'][0]],
-                'all_points_y': [y for y in shape['points'][1]],
-                'name': shape['label']
-            } for shape in annotation['shapes'] if shape['label'] in CLA_DIC.keys()]
-            image_path = os.path.join(dataset_dir, annotation['imagePath'])
-            image = skimage.io.imread(image_path)
-            height, width = image.shape[:2]
+            try:
+                polygons = [{
+                    'all_points_x': [x for x in shape['points'][0]],
+                    'all_points_y': [y for y in shape['points'][1]],
+                    'name': shape['label']
+                } for shape in annotation['shapes'] if shape['label'] in CLA_DIC.keys()]
+                image_path = os.path.join(dataset_dir, annotation['imagePath'])
+                image = skimage.io.imread(image_path)
+                height, width = image.shape[:2]
 
-            self.add_image(
-                "disease",
-                image_id=annotation['imagePath'],  # use file name as a unique image id
-                path=image_path,
-                width=width, height=height,
-                polygons=polygons)
+                self.add_image(
+                    "disease",
+                    image_id=annotation['imagePath'],  # use file name as a unique image id
+                    path=image_path,
+                    width=width, height=height,
+                    polygons=polygons)
+            except Exception as e:
+                continue
 
     def auto_download(self, dataDir, dataType, dataYear):
         """Download the COCO dataset/annotations if requested.

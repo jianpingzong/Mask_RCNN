@@ -154,8 +154,8 @@ class DiseaseDataset(utils.Dataset):
             annotation = json.load(open(os.path.join(dataset_dir, i)))
             try:
                 polygons = [{
-                    'all_points_x': [x for x in shape['points'][0]],
-                    'all_points_y': [y for y in shape['points'][1]],
+                    'all_points_x': [p[0] for p in shape['points']],
+                    'all_points_y': [p[1] for p in shape['points']],
                     'name': shape['label']
                 } for shape in annotation['shapes'] if shape['label'] in CLA_DIC.keys()]
                 image_path = os.path.join(dataset_dir, annotation['imagePath'])

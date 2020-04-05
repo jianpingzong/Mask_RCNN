@@ -51,8 +51,8 @@ COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
 DEFAULT_DATASET_YEAR = "2014"
 
-# detective class
-CLA_DIC = {
+# Disease dictionary.
+DISEASE_DIC = {
     'crack': 1,
     'cornerfracture': 2,
     'seambroken': 3,
@@ -82,7 +82,7 @@ class DiseaseConfig(Config):
     IMAGES_PER_GPU = 1
 
     # Number of classes(include background).
-    NUM_CLASSES = 1 + 8
+    NUM_CLASSES = 1 + len(DISEASE_DIC)
 
     # Number of training steps per epoch.
     STEPS_PER_EPOCH = 100
@@ -91,108 +91,104 @@ class DiseaseConfig(Config):
     DETECTION_MIN_CONFIDENCE = 0.8
 
 
-############################################################
-#  Dataset
-############################################################
+##################################################
+# Dataset
+##################################################
+
 
 class DiseaseDataset(utils.Dataset):
+
     def load_disease(self, dataset_dir, subset):
-        """Load a subset of the COCO dataset.
-        dataset_dir: The root directory of the COCO dataset.
-        subset: What to load (train, val, minival, valminusminival)
-        year: What dataset year to load (2014, 2017) as a string, not an integer
-        class_ids: If provided, only loads images that have the given classes.
-        class_map: TODO: Not implemented yet. Supports maping classes from
-            different datasets to the same class ID.
-        return_coco: If True, returns the COCO object.
-        auto_download: Automatically download and unzip MS-COCO images and annotations
+        """Load a subset of disease dataset.
+        dataset_dir: directory of dataset
+        subset: train or val subset
         """
         # Add classes.
-        self.add_class("disease", 1, "crack")
-        self.add_class("disease", 2, "cornerfracture")
-        self.add_class("disease", 3, "seambroken")
-        self.add_class("disease", 4, "patch")
-        self.add_class("disease", 5, "repair")
-        self.add_class("disease", 6, "slab")
-        self.add_class("disease", 7, "track")
-        self.add_class("disease", 8, "light")
+        for d in DISEASE_DIC:
+            self.add_class("disease", DISEASE_DIC[d], d)
 
-        # Train or validation dataset?
+        # Train or val dataset?
         assert subset in ["train", "val"]
         dataset_dir = os.path.join(dataset_dir, subset)
 
         # Load annotations
-        # labelme saves each image in the form:
-        # { "imagePath": "11635_43_15640.bmp",
-        #   "shapes": [
-        #       {
-        #           "label": "track",
-        #           "points": [
-        #               [
-        #                   151.32558139534885,
-        #                   1.139534883720934
-        #               ],
-        #               ... more points ...
-        #           ]
-        #       },
-        #       ... more regions ...
-        #   ],
-        #   "imageHeight": 900,
-        #   "imageWidth": 1600,
-        #   ... more attribution ...
+        # labelme (3.16.7) saves each annotation in the form:
+        # {
+        #     "shapes": [
+        #         {
+        #             "label": "slab",
+        #             "points": [
+        #                 [
+        #                     126.4797507788162,
+        #                     1.8691588785046729
+        #                 ],
+        #                 ... more points ...
+        #             ],
+        #             ... more polygon informations ...
+        #         },
+        #         ... more shapes ...
+        #     ],
+        #     "imagePath": "11635_48_17549.bmp",
+        #     "imageHeight": 900,
+        #     "imageWidth": 1800,
+        #     ... more attributions ...
         # }
-        # We mostly care about the x and y coordinates of each region
+        # We mostly care about the x and y coordinates of each shape.
         for i in os.listdir(dataset_dir):
-            if not i.endswith('.json'):
+            # Select json file.
+            if not i.lower().endswith('.json'):
                 continue
+
+            # Load annotation from file.
             annotation = json.load(open(os.path.join(dataset_dir, i)))
+
+            # Assemble x and y coordinates.
+            polygons = [{
+                'all_points_x': [p[0] for p in shape['points']],
+                'all_points_y': [p[1] for p in shape['points']],
+                'label': shape['label']
+            } for shape in annotation['shapes'] if shape['label'] in DISEASE_DIC.keys()]
+
+            # Assemble image path.
+            image_path = os.path.join(dataset_dir, annotation['imagePath'])
+
+            # Assemble image width and height.
             try:
-                polygons = [{
-                    'all_points_x': [p[0] for p in shape['points']],
-                    'all_points_y': [p[1] for p in shape['points']],
-                    'name': shape['label']
-                } for shape in annotation['shapes'] if shape['label'] in CLA_DIC.keys()]
-                image_path = os.path.join(dataset_dir, annotation['imagePath'])
+                height = annotation['imageHeight']
+                width = annotation['imageWidth']
+            except KeyError as e:
                 image = skimage.io.imread(image_path)
                 height, width = image.shape[:2]
 
-                self.add_image(
-                    "disease",
-                    image_id=annotation['imagePath'],  # use file name as a unique image id
-                    path=image_path,
-                    width=width, height=height,
-                    polygons=polygons)
-            except Exception as e:
-                continue
+            self.add_image(
+                "disease",
+                image_id=annotation['imagePath'],
+                path=image_path,
+                width=width, height=height,
+                polygons=polygons
+            )
 
     def load_mask(self, image_id):
         """Generate instance masks for an image.
-       Returns:
-        masks: A bool array of shape [height, width, instance count] with
-            one mask per instance.
-        class_ids: a 1D array of class IDs of the instance masks.
+        :returns
+        masks: A bool array of shape[height, width, instance_count] with one mask per instance.
+        class_ids: A 1D array of class IDs of the instance masks.
         """
-        # If not a balloon dataset image, delegate to parent class.
+        # If not a disease dataset image, delegate to parent class.
         image_info = self.image_info[image_id]
         if image_info["source"] != "disease":
             return super(self.__class__, self).load_mask(image_id)
 
-        # Convert polygons to a bitmap mask of shape
+        # Convert polygons to a bitmap mask of shape.
         # [height, width, instance_count]
         info = self.image_info[image_id]
-        mask = np.zeros([info["height"], info["width"], len(info["polygons"])],
-                        dtype=np.uint8)
+        mask = np.zeros([info["height"], info["width"], len(info["polygons"])], dtype=np.uint8)
         class_ids = []
         for i, p in enumerate(info["polygons"]):
-            # Get indexes of pixels inside the polygon and set them to 1
             rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
             mask[rr, cc, i] = 1
+            class_ids.append(DISEASE_DIC[p['label']])
 
-            # class_ids preparation
-            class_ids.append(CLA_DIC[p['name']])
-
-        # Return mask, and array of class IDs of each instance. Since we have
-        # one class ID only, we return an array of 1s
         return mask.astype(np.bool), np.array(class_ids, dtype=np.int32)
 
     def image_reference(self, image_id):

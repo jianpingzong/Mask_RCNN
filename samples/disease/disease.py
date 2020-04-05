@@ -63,34 +63,32 @@ CLA_DIC = {
     'light': 8
 }
 
-############################################################
-#  Configurations
-############################################################
+##################################################
+# Configurations
+##################################################
 
 
 class DiseaseConfig(Config):
-    """Configuration for training on MS COCO.
-    Derives from the base Config class and overrides values specific
-    to the COCO dataset.
+    """Configurations for disease dataset from CAUC.
+    It's designed for a specific computer.
+    CPU: i7-8700
+    RAM: 64G
+    GPU: GTX 1080Ti with 11G RAM
     """
-    # Give the configuration a recognizable name
+    # Name for recognization of configuration.
     NAME = "disease"
 
-    # We use a GPU with 12GB memory, which can fit two images.
-    # Adjust down if you use a smaller GPU.
+    # Adjust for different GPU.
     IMAGES_PER_GPU = 1
 
-    # Uncomment to train on 8 GPUs (default is 1)
-    # GPU_COUNT = 8
+    # Number of classes(include background).
+    NUM_CLASSES = 1 + 8
 
-    # Number of classes (including background)
-    NUM_CLASSES = 1 + 8  # COCO has 80 classes
+    # Number of training steps per epoch.
+    STEPS_PER_EPOCH = 100
 
-    # Number of training steps per epoch
-    STEPS_PER_EPOCH = 1000
-
-    # Skip detections with < 90% confidence
-    DETECTION_MIN_CONFIDENCE = 0.9
+    # Threshold of detection confidence.
+    DETECTION_MIN_CONFIDENCE = 0.8
 
 
 ############################################################

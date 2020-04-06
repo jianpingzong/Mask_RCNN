@@ -1,57 +1,52 @@
 """
-Mask R-CNN
-Configurations and data loading code for MS COCO.
+Mask RCNN
+Configurations and data loading code for disease dataset from airport.
 
-Copyright (c) 2017 Matterport, Inc.
+Copyright (c) 2020 Chienping Tsung
 Licensed under the MIT License (see LICENSE for details)
-Written by Waleed Abdulla
+Written by Chienping Tsung
 
-------------------------------------------------------------
+--------------------------------------------------
 
-Usage: import the module (see Jupyter notebooks for examples), or run from
-       the command line as such:
+Usage:
+    run from the command line as such:
 
     # Train a new model starting from pre-trained COCO weights
-    python3 coco.py train --dataset=/path/to/coco/ --model=coco
+    python3 disease.py train --dataset=/path/to/disease/dataset --weights=coco
 
-    # Train a new model starting from ImageNet weights. Also auto download COCO dataset
-    python3 coco.py train --dataset=/path/to/coco/ --model=imagenet --download=True
+    # Resume training a model that you had trained earlier
+    python3 disease.py train --dataset=/path/to/disease/dataset --weights=last
 
-    # Continue training a model that you had trained earlier
-    python3 coco.py train --dataset=/path/to/coco/ --model=/path/to/weights.h5
+    # Train a new model starting from ImageNet weights
+    python3 disease.py train --dataset=/path/to/disease/dataset --weights=imagenet
 
-    # Continue training the last model you trained
-    python3 coco.py train --dataset=/path/to/coco/ --model=last
-
-    # Run COCO evaluatoin on the last model you trained
-    python3 coco.py evaluate --dataset=/path/to/coco/ --model=last
+    # Apply detection to an image
+    python3 disease.py detect --weights=/path/to/weights/file.h5 --image=<URL or path to file>
 """
 
 import os
 import sys
 import json
-import datetime
 import numpy as np
-import skimage
 import skimage.draw
 
 # Root directory of the project
 ROOT_DIR = os.path.abspath("../../")
 
 # Import Mask RCNN
-sys.path.append(ROOT_DIR)  # To find local version of the library
+sys.path.append(ROOT_DIR)
 from mrcnn.config import Config
 from mrcnn import model as modellib, utils
+from mrcnn import visualize
 
-# Path to trained weights file
+# Default path for saving logs and checkpoints.
+DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
+
+# Path to coco trained weights file.
 COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 
-# Directory to save logs and model checkpoints, if not provided
-# through the command line argument --logs
-DEFAULT_LOGS_DIR = os.path.join(ROOT_DIR, "logs")
-DEFAULT_DATASET_YEAR = "2014"
-
 # Disease dictionary.
+# The numbers should be continuous from 1.
 DISEASE_DIC = {
     'crack': 1,
     'cornerfracture': 2,
@@ -200,6 +195,10 @@ class DiseaseDataset(utils.Dataset):
             super(self.__class__, self).image_reference(image_id)
 
 
+##################################################
+# train and detect
+##################################################
+
 def train(model):
     """Train the model."""
     # Training dataset.
@@ -207,175 +206,118 @@ def train(model):
     dataset_train.load_disease(args.dataset, "train")
     dataset_train.prepare()
 
-    # Validation dataset
+    # Validation dataset.
     dataset_val = DiseaseDataset()
     dataset_val.load_disease(args.dataset, "val")
     dataset_val.prepare()
 
     # Augmentation settings
-    from imgaug import augmenters as iaa
-    aug = iaa.Sequential([
-        iaa.Fliplr(0.5), # horizontal flips
-        iaa.Flipud(0.5), # vertical flips
-        iaa.Crop(percent=(0, 0.25)), # random crops
-        # Small gaussian blur with random sigma between 0 and 0.5.
-        # But we only blur about 50% of all images.
-        iaa.Sometimes(
-            0.5,
-            iaa.GaussianBlur(sigma=(0, 0.5))
-        ),
-        # Strengthen or weaken the contrast in each image.
-        iaa.LinearContrast((0.75, 1.5)),
-        # Add gaussian noise.
-        # For 50% of all images, we sample the noise once per pixel.
-        # For the other 50% of all images, we sample the noise per pixel AND
-        # channel. This can change the color (not only brightness) of the
-        # pixels.
-        iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05*255), per_channel=0.5),
-        # Make some images brighter and some darker.
-        # In 20% of all cases, we sample the multiplier once per channel,
-        # which can end up changing the color of the images.
-        iaa.Multiply((0.8, 1.2), per_channel=0.2),
-        # Apply affine transformations to each image.
-        # Scale/zoom them, translate/move them, rotate them and shear them.
-        iaa.Affine(
-            scale={"x": (0.8, 1.2), "y": (0.8, 1.2)},
-            translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
-            rotate=(-25, 25),
-            shear=(-8, 8)
-        )
-        ], random_order=True)
+    # from imgaug import augmenters as iaa
+    # aug = iaa.Sequential([
+    #     iaa.Fliplr(0.5), # horizontal flips
+    #     iaa.Flipud(0.5), # vertical flips
+    #     iaa.Crop(percent=(0, 0.25)), # random crops
+    #     # Small gaussian blur with random sigma between 0 and 0.5.
+    #     # But we only blur about 50% of all images.
+    #     iaa.Sometimes(
+    #         0.5,
+    #         iaa.GaussianBlur(sigma=(0, 0.5))
+    #     ),
+    #     # Strengthen or weaken the contrast in each image.
+    #     iaa.LinearContrast((0.75, 1.5)),
+    #     # Add gaussian noise.
+    #     # For 50% of all images, we sample the noise once per pixel.
+    #     # For the other 50% of all images, we sample the noise per pixel AND
+    #     # channel. This can change the color (not only brightness) of the
+    #     # pixels.
+    #     iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05*255), per_channel=0.5),
+    #     # Make some images brighter and some darker.
+    #     # In 20% of all cases, we sample the multiplier once per channel,
+    #     # which can end up changing the color of the images.
+    #     iaa.Multiply((0.8, 1.2), per_channel=0.2),
+    #     # Apply affine transformations to each image.
+    #     # Scale/zoom them, translate/move them, rotate them and shear them.
+    #     iaa.Affine(
+    #         scale={"x": (0.8, 1.2), "y": (0.8, 1.2)},
+    #         translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
+    #         rotate=(-25, 25),
+    #         shear=(-8, 8)
+    #     )
+    #     ], random_order=True)
 
-    # *** This training schedule is an example. Update to your needs ***
-    print("Training network heads")
-    model.train(dataset_train, dataset_val,
-                learning_rate=config.LEARNING_RATE,
-                epochs=30,
-                layers='all',
-                augmentation=aug)
+    # Start training here.
+    print("Start training.")
+    model.train(
+        dataset_train, dataset_val,
+        learning_rate=config.LEARNING_RATE,
+        epochs=30,
+        layers='heads',
+        augmentation=None
+    )
 
+def detect(model, image_path=None):
+    assert image_path
 
-def color_splash(image, mask):
-    """Apply color splash effect.
-    image: RGB image [height, width, 3]
-    mask: instance segmentation mask [height, width, instance count]
+    print("Running on {}.".format(image_path))
+    # Read the image.
+    image = skimage.io.imread(image_path)
+    # Detect objects.
+    r = model.detect([image], verbose=1)[0]
+    # Visualization and save the output.
+    visualize.display_instances(
+        image, r['rois'], r['masks'], r['class_ids'], list(DISEASE_DIC.keys()),
+        scores=r['scores'], title=image_path,
+        making_image=True
+    )
+    print("Saved to splash.png.")
 
-    Returns result image.
-    """
-    # Make a grayscale copy of the image. The grayscale copy still
-    # has 3 RGB channels, though.
-    gray = skimage.color.gray2rgb(skimage.color.rgb2gray(image)) * 255
-    # Copy color pixels from the original color image where mask is set
-    if mask.shape[-1] > 0:
-        # We're treating all instances as one, so collapse the mask into one layer
-        mask = (np.sum(mask, -1, keepdims=True) >= 1)
-        splash = np.where(mask, image, gray).astype(np.uint8)
-    else:
-        splash = gray.astype(np.uint8)
-    return splash
-
-
-def detect_and_color_splash(model, image_path=None, video_path=None):
-    assert image_path or video_path
-
-    # Image or video?
-    if image_path:
-        # Run model detection and generate the color splash effect
-        print("Running on {}".format(args.image))
-        # Read image
-        image = skimage.io.imread(args.image)
-        # Detect objects
-        r = model.detect([image], verbose=1)[0]
-        # Color splash
-        splash = color_splash(image, r['masks'])
-        # Save output
-        file_name = "splash_{:%Y%m%dT%H%M%S}.png".format(datetime.datetime.now())
-        skimage.io.imsave(file_name, splash)
-    elif video_path:
-        import cv2
-        # Video capture
-        vcapture = cv2.VideoCapture(video_path)
-        width = int(vcapture.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(vcapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = vcapture.get(cv2.CAP_PROP_FPS)
-
-        # Define codec and create video writer
-        file_name = "splash_{:%Y%m%dT%H%M%S}.avi".format(datetime.datetime.now())
-        vwriter = cv2.VideoWriter(file_name,
-                                  cv2.VideoWriter_fourcc(*'MJPG'),
-                                  fps, (width, height))
-
-        count = 0
-        success = True
-        while success:
-            print("frame: ", count)
-            # Read next image
-            success, image = vcapture.read()
-            if success:
-                # OpenCV returns images as BGR, convert to RGB
-                image = image[..., ::-1]
-                # Detect objects
-                r = model.detect([image], verbose=0)[0]
-                # Color splash
-                splash = color_splash(image, r['masks'])
-                # RGB -> BGR to save image to video
-                splash = splash[..., ::-1]
-                # Add image to video writer
-                vwriter.write(splash)
-                count += 1
-        vwriter.release()
-    print("Saved to ", file_name)
-
-
-############################################################
-#  Training
-############################################################
-
-
+##################################################
+# main
+##################################################
 if __name__ == '__main__':
     import argparse
 
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description='Train Mask R-CNN to detect disease.')
-    parser.add_argument("command",
-                        metavar="<command>",
-                        help="'train' or 'splash'")
-    parser.add_argument('--dataset', required=False,
-                        metavar="/path/to/balloon/dataset/",
-                        help='Directory of the disease dataset')
-    parser.add_argument('--weights', required=True,
-                        metavar="/path/to/weights.h5",
-                        help="Path to weights .h5 file or 'coco'")
-    parser.add_argument('--logs', required=False,
-                        default=DEFAULT_LOGS_DIR,
-                        metavar="/path/to/logs/",
-                        help='Logs and checkpoints directory (default=logs/)')
-    parser.add_argument('--image', required=False,
-                        metavar="path or URL to image",
-                        help='Image to apply the color splash effect on')
-    parser.add_argument('--video', required=False,
-                        metavar="path or URL to video",
-                        help='Video to apply the color splash effect on')
+    # Parse the arguments from command line.
+    parser = argparse.ArgumentParser(description="Detector for diseases from airport via Mask RCNN.")
+    parser.add_argument(
+        'command',
+        help="'train' or 'detect'", metavar="<command>"
+    )
+    parser.add_argument(
+        '--dataset', required=False,
+        help="Directory of the disease dataset.", metavar="/path/to/disease/dataset"
+    )
+    parser.add_argument(
+        '--weights', required=True,
+        help="Path to weights .h5 file or 'coco'", metavar="/path/to/weights.h5"
+    )
+    parser.add_argument(
+        '--logs', default=DEFAULT_LOGS_DIR, required=False,
+        help="Logs and checkpoints directory.", metavar="/path/to/logs"
+    )
+    parser.add_argument(
+        '--image', required=False,
+        help="Image to detect the diseases.", metavar="path or URL to image"
+    )
     args = parser.parse_args()
 
-    # Validate arguments
-    if args.command == "train":
-        assert args.dataset, "Argument --dataset is required for training"
-    elif args.command == "splash":
-        assert args.image or args.video,\
-               "Provide --image or --video to apply color splash"
-
+    # Validate the arguments.
+    assert args.command in ['train', 'detect']
+    if args.command == 'train':
+        assert args.dataset
+        print("Dataset: ", args.dataset)
+    elif args.command == 'detect':
+        assert args.image
+        print("Image: ", args.image)
     print("Weights: ", args.weights)
-    print("Dataset: ", args.dataset)
     print("Logs: ", args.logs)
 
     # Configurations
-    if args.command == "train":
+    if args.command == 'train':
         config = DiseaseConfig()
     else:
         class InferenceConfig(DiseaseConfig):
-            # Set batch size to 1 since we'll be running inference on
+            # Set the batch size to 1 since we'll be running detection.
             # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
             GPU_COUNT = 1
             IMAGES_PER_GPU = 1
@@ -383,45 +325,41 @@ if __name__ == '__main__':
     config.display()
 
     # Create model
-    if args.command == "train":
-        model = modellib.MaskRCNN(mode="training", config=config,
-                                  model_dir=args.logs)
+    if args.command == 'train':
+        model = modellib.MaskRCNN(mode='training', config=config, model_dir=args.logs)
     else:
-        model = modellib.MaskRCNN(mode="inference", config=config,
-                                  model_dir=args.logs)
+        model = modellib.MaskRCNN(mode='inference', config=config, model_dir=args.logs)
 
-    # Select weights file to load
-    if args.weights.lower() == "coco":
+    # Prepare the weights
+    if args.weights.lower() == 'coco':
         weights_path = COCO_WEIGHTS_PATH
-        # Download weights file
+        # Download the coco weights file
         if not os.path.exists(weights_path):
             utils.download_trained_weights(weights_path)
-    elif args.weights.lower() == "last":
-        # Find last trained weights
+    elif args.weights.lower() == 'last':
+        # Find the last trained weights
         weights_path = model.find_last()
-    elif args.weights.lower() == "imagenet":
+    elif args.weights.lower() == 'imagenet':
         # Start from ImageNet trained weights
         weights_path = model.get_imagenet_weights()
     else:
         weights_path = args.weights
 
     # Load weights
-    print("Loading weights ", weights_path)
-    if args.weights.lower() == "coco":
-        # Exclude the last layers because they require a matching
-        # number of classes
+    print("Loading weights: ", weights_path)
+    if args.weights.lower() == 'coco':
+        # Exclude the last layers because different numbers of classes.
         model.load_weights(weights_path, by_name=True, exclude=[
-            "mrcnn_class_logits", "mrcnn_bbox_fc",
-            "mrcnn_bbox", "mrcnn_mask"])
+            'mrcnn_class_logits',
+            'mrcnn_bbox_fc',
+            'mrcnn_bbox',
+            'mrcnn_mask'
+        ])
     else:
         model.load_weights(weights_path, by_name=True)
 
-    # Train or evaluate
-    if args.command == "train":
+    # Train or detect
+    if args.command == 'train':
         train(model)
-    elif args.command == "splash":
-        detect_and_color_splash(model, image_path=args.image,
-                                video_path=args.video)
-    else:
-        print("'{}' is not recognized. "
-              "Use 'train' or 'splash'".format(args.command))
+    elif args.command == 'detect':
+        detect(model, args.image)

@@ -264,8 +264,9 @@ def detect(model, image_path=None):
     # Detect objects.
     r = model.detect([image], verbose=1)[0]
     # Visualization and save the output.
+    class_names = ['background'] + list(DISEASE_DIC.keys())
     visualize.display_instances(
-        image, r['rois'], r['masks'], r['class_ids'], list(DISEASE_DIC.keys()),
+        image, r['rois'], r['masks'], r['class_ids'], class_names,
         scores=r['scores'], title=image_path
     )
     print("Saved to splash.png.")

@@ -83,7 +83,7 @@ class DiseaseConfig(Config):
     STEPS_PER_EPOCH = 100
 
     # Threshold of detection confidence.
-    DETECTION_MIN_CONFIDENCE = 0.8
+    DETECTION_MIN_CONFIDENCE = 0.6
 
 
 ##################################################

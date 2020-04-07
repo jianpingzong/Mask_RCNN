@@ -266,8 +266,7 @@ def detect(model, image_path=None):
     # Visualization and save the output.
     visualize.display_instances(
         image, r['rois'], r['masks'], r['class_ids'], list(DISEASE_DIC.keys()),
-        scores=r['scores'], title=image_path,
-        making_image=True
+        scores=r['scores'], title=image_path
     )
     print("Saved to splash.png.")
 

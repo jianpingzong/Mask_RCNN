@@ -80,10 +80,20 @@ class DiseaseConfig(Config):
     NUM_CLASSES = 1 + len(DISEASE_DIC)
 
     # Number of training steps per epoch.
-    STEPS_PER_EPOCH = 100
+    STEPS_PER_EPOCH = 1000
 
     # Threshold of detection confidence.
-    DETECTION_MIN_CONFIDENCE = 0.6
+    DETECTION_MIN_CONFIDENCE = 0.7
+
+    # Extra configurations.
+    GPU_COUNT = 1
+    VALIDATION_STEPS = 50
+    BACKBONE = "resnet101"
+    RPN_ANCHOR_SCALES = (64, 128, 256, 512, 1024)
+    RPN_ANCHOR_RATIOS = [0.5, 1, 2]
+    IMAGE_MIN_DIM = 800
+    IMAGE_MAX_DIM = 1856
+    TRAIN_ROIS_PER_IMAGE = 100
 
 
 ##################################################
@@ -247,8 +257,8 @@ def train(model):
     model.train(
         dataset_train, dataset_val,
         learning_rate=config.LEARNING_RATE,
-        epochs=30,
-        layers='heads',
+        epochs=60,
+        layers='all',
         augmentation=aug
     )
 

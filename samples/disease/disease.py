@@ -137,12 +137,17 @@ class DiseaseDataset(utils.Dataset):
             # Load annotation from file.
             annotation = json.load(open(os.path.join(dataset_dir, i)))
 
-            # Assemble x and y coordinates.
-            polygons = [{
-                'all_points_x': [p[0] for p in shape['points']],
-                'all_points_y': [p[1] for p in shape['points']],
-                'label': shape['label']
-            } for shape in annotation['shapes'] if shape['label'] in DISEASE_DIC.keys()]
+            # Assemble x and y coordinates, and filter the required shape.
+            polygons = [
+                {
+                    'all_points_x': [p[0] for p in shape['points']],
+                    'all_points_y': [p[1] for p in shape['points']],
+                    'label': shape['label'],
+                    'shape_type': shape['shape_type']
+                } for shape in annotation['shapes']
+                    if shape['label'] in DISEASE_DIC.keys() and
+                       shape['shape_type'] in ['polygon', 'circle']
+            ]
 
             # Assemble image path.
             image_path = os.path.join(dataset_dir, annotation['imagePath'])
@@ -180,7 +185,15 @@ class DiseaseDataset(utils.Dataset):
         mask = np.zeros([info["height"], info["width"], len(info["polygons"])], dtype=np.uint8)
         class_ids = []
         for i, p in enumerate(info["polygons"]):
-            rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
+            if p['shape_type'] == 'polygon':
+                rr, cc = skimage.draw.polygon(p['all_points_y'], p['all_points_x'])
+            elif p['shape_type'] == 'circle':
+                rr, cc = skimage.draw.circle(
+                    p['all_points_y'][0], p['all_points_x'][0],
+                    ((p['all_points_y'][0] - p['all_points_y'][1])**2 + (p['all_points_x'][0] - p['all_points_x'][1])**2)**0.5
+                )
+            else:
+                raise Exception("Undefined shape_type: {}".format(p['shape_type']))
             mask[rr, cc, i] = 1
             class_ids.append(DISEASE_DIC[p['label']])
 

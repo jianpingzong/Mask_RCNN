@@ -86,7 +86,7 @@ class DiseaseConfig(Config):
     DETECTION_MIN_CONFIDENCE = 0.7
 
     # Extra configurations.
-    GPU_COUNT = 2
+    GPU_COUNT = 1
     VALIDATION_STEPS = 50
     BACKBONE = "resnet50"
     RPN_ANCHOR_SCALES = (64, 128, 256, 512, 1024)

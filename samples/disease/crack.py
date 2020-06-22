@@ -48,14 +48,7 @@ COCO_WEIGHTS_PATH = os.path.join(ROOT_DIR, "mask_rcnn_coco.h5")
 # Disease dictionary.
 # The numbers should be continuous from 1.
 DISEASE_DIC = {
-    'crack': 1,
-    'cornerfracture': 2,
-    'seambroken': 3,
-    'patch': 4,
-    'repair': 5,
-    'slab': 6,
-    'track': 7,
-    'light': 8
+    'crack': 1
 }
 
 ##################################################
@@ -90,7 +83,7 @@ class DiseaseConfig(Config):
     VALIDATION_STEPS = 50
     BACKBONE = "resnet50"
     RPN_ANCHOR_SCALES = (64, 128, 256, 512, 1024)
-    RPN_ANCHOR_RATIOS = [0.5, 1, 2]
+    RPN_ANCHOR_RATIOS = [0.18, 0.5, 1, 2, 5.56]
     IMAGE_MIN_DIM = 800
     IMAGE_MAX_DIM = 1856
     TRAIN_ROIS_PER_IMAGE = 100
